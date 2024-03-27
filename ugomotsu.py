@@ -10,23 +10,9 @@ import hashlib
 import concurrent.futures
 #import datetime
 #----------------------------------------
-# .cm-info.json file path
-#base_folder = "models\Stable-diffusion"
-#base_folder = "R:\Temp"
-#base_folder = "A:\Checkpoint"
-#base_folder = "A:\@"
-base_folder = "A:\\Checkpoint\\SDXL\\tkvier"
-
-# True to download cg files. False if not desired.
-#cg_download = False
-cg_download = True
+appver = "0.1.1"
+config_json = 'config.json'
 #----------------------------------------
-# ファイルを上書き
-#over_write = False
-over_write = True
-appver = 0.1
-#----------------------------------------
-
 class civitai_ModelAPI:
     def __init__(self):
         """
@@ -77,6 +63,7 @@ class civitai_ModelAPI:
         civitaiapi = netio(url)
         if not civitaiapi.get():
             return False
+
         json_data = civitaiapi.response.json()
         self.model_id = json_data.get("id")
         self.model_name = json_data.get("name")
@@ -142,6 +129,8 @@ class civitai_ModelAPI:
                 self.hashes =  files.get("hashes")
                 hoged = item.get("images")
                 self.ImageURLs = [hoge.get('url') for hoge in hoged ]
+            else:
+                return False
         return True
     def _remove_html_tags(self,input_string):
         """
@@ -549,7 +538,7 @@ def mainform(filelist):
         list_cnt = len(filelist)
         list_now = 0
         fio = fileio()
-        if fio.read('config.json'):
+        if fio.read(config_json):
             config_data = json.loads(fio.filedata)
             nothumbnail = config_data.get('nothumbnail')
             noInternetShortcut = config_data.get('noInternetShortcut')
@@ -557,6 +546,7 @@ def mainform(filelist):
             nomodelinfo = config_data.get('nomodelinfo')
             noversioninfo = config_data.get('noversioninfo')
             noexamplecg = config_data.get('noexamplecg')
+            processmsg("config.jsonを読み込み、初期設定を設定しました")
         else:
             nothumbnail = False
             noInternetShortcut = False
@@ -564,6 +554,7 @@ def mainform(filelist):
             nomodelinfo = False
             noversioninfo = False
             noexamplecg = False
+            processmsg(f"{config_json}を読み込み、初期設定を設定しました")
         processmsg(f"処理を開始します\n処理件数は{list_cnt}件です")
         if not civitai_livechecker():
             processmsg("Civitaiへのアクセスに失敗した為、処理を終了します")
@@ -705,7 +696,7 @@ def infoform():
             noversioninfo = noversioninfo_var.get(),
             noexamplecg = noexamplecg_var.get()
         )
-        fio.json('config.json',dic)
+        fio.json(config_json,dic)
 
     info_root = tk.Tk()
     info_root.title(f"ugomotsu v{appver}")
@@ -727,7 +718,7 @@ def infoform():
     noversioninfo_var = tk.BooleanVar()
     noexamplecg_var = tk.BooleanVar()
     fio = fileio()
-    if fio.read('config.json'):
+    if fio.read(config_json):
         config_data = json.loads(fio.filedata)
         nothumbnail_var.set(config_data.get('nothumbnail'))
         noInternetShortcut_var.set(config_data.get('noInternetShortcut'))
@@ -778,6 +769,7 @@ def addtasklist(argvs):
 
 def main():
     if len(sys.argv) > 1:
+        print(config_json)
         files = sys.argv
         files.pop(0)
         hoge = addtasklist(files)
