@@ -10,7 +10,7 @@ import hashlib
 import concurrent.futures
 #import datetime
 #----------------------------------------
-appver = "0.1.1"
+appver = "0.1.2"
 config_json = 'config.json'
 #----------------------------------------
 class civitai_ModelAPI:
