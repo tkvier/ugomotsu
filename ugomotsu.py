@@ -6,12 +6,13 @@ import requests
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import scrolledtext
+from tkinter import messagebox
 import hashlib
 import concurrent.futures
 #import datetime
 #----------------------------------------
-appver = "0.1.2"
-config_json = 'config.json'
+appver = "0.1.3"
+config_json = os.path.join(os.path.dirname(sys.argv[0]),'config.json')
 #----------------------------------------
 class civitai_ModelAPI:
     def __init__(self):
@@ -112,13 +113,21 @@ class civitai_ModelAPI:
             self.creator = "No Data"
         else:
             self.creator = json_data["creator"]["username"]
+        verchkflg = False
         for item in json_data.get("modelVersions"):
             if item.get("id") == verid:
+                verchkflg = True
                 self.ver_id = item.get("id")
                 self.ver_name = item.get("name")
                 self.ver_fname = pathname_organization(self.ver_name)
                 self.upload_date = item.get("createdAt")
                 self.publish_date = item.get("publishedAt")
+                if item.get("trainedWords") == None:
+                    print("None")
+                    self.trainedWords = False
+                else:
+                    self.trainedWords = '\n'.join(item.get("trainedWords"))
+                    print(self.trainedWords)
                 self.model_basemodel = item.get("baseModel")
                 self.model_basemodeltype = item.get("baseModelType")
                 self.stats = item.get("stats")
@@ -129,9 +138,10 @@ class civitai_ModelAPI:
                 self.hashes =  files.get("hashes")
                 hoged = item.get("images")
                 self.ImageURLs = [hoge.get('url') for hoge in hoged ]
-            else:
-                return False
-        return True
+        if verchkflg:
+            return True
+        else:
+            return False
     def _remove_html_tags(self,input_string):
         """
             HTMLタグを除去する。
@@ -193,53 +203,52 @@ class cmapi(civitai_ModelAPI):
         url = f"https://civitai.com/api/v1/models/{modelid}"
         return super().get(url, modelid, verid)
 
-    def Create_InternetShortcutdata(self,folder):
+    def create_triggerfile(self,path,ow):
         """
-            インターネットショートカットを作成
+            トリガーワードファイルを作成
         Args:
-            folder (str):   ショートカットを作成するフォルダ
+            folder (str):   作成するパス
         Returns:
             成功判断
         """
-        iscpath = os.path.join(folder, f"{self.model_name} - Stable Diffusion {self.model_type} - Civitai.url")
         fio = fileio()
-        if fio.chkpath(iscpath):
+        if not self.trainedWords:
             return False
-        tmptext = "[InternetShortcut]\n" \
-            f"URL=https://civitai.com/models/{self.model_id}\n"
-        fio = fileio()
-        return fio.write(iscpath,tmptext)
+        return fio.write(path,self.trainedWords,ow)
 
-    def create_permitinfodata(self,folder):
+    def create_permitinfodata(self,folder,ow):
         """
             パーミッションファイルを作成
         Args:
-            path (str):   作成するパス
+            folder (str):   作成するパス
         Returns:
             成功判断
         """
         fio = fileio()
         path = os.path.join(folder,self.permits_file)
         if fio.chkpath(path):
-            return False
+            if ow != "ow":
+                return False
         tmptext = f"< {self.model_name} の禁止事項 >\n※"
         tmptext += self._jp_datetime(self.upload_date)
         tmptext += "現在\n\n"
         tmptext += self.disable_permits
-        return fio.write(path,tmptext)
+        return fio.write(path,tmptext,ow)
 
-    def create_modelinfo(self,folder):
+    # モデル情報
+    def create_modelinfo(self,folder,ow):
         """
             モデル情報を作成
         Args:
-            folder (str):   作成するフォルダ
+            folder (str):   作成するパス
         Returns:
             成功判断
         """
         path = os.path.join(folder,f"About {self.model_fname}.txt")
         fio = fileio()
         if fio.chkpath(path):
-            return False
+            if ow != "ow":
+                return False
         tmptext = "----------------------------------------\n" \
             "< モデル情報 >\n" \
             f"クリエイター: {self.creator}\n" \
@@ -254,9 +263,10 @@ class cmapi(civitai_ModelAPI):
         if self.model_description != None:
             tmptext += "< モデルについて >\n"
             tmptext += self._remove_html_tags(self.model_description)
-        return fio.write(path,tmptext)
+        return fio.write(path,tmptext,ow)
+
     # バージョン情報
-    def create_verinfo(self,folder,hash):
+    def create_verinfo(self,folder,hash,ow):
         """
             バージョン情報を作成
         Args:
@@ -267,7 +277,8 @@ class cmapi(civitai_ModelAPI):
         path = os.path.join(folder,f"About {self.model_fname} {self.ver_fname}.txt")
         fio = fileio()
         if fio.chkpath(path):
-            return False
+            if ow != "ow":
+                return False
         tmptext = "----------------------------------------\n" \
             "< バージョン情報 >\n" \
             f"モデル名: {self.model_name}\n" \
@@ -277,16 +288,18 @@ class cmapi(civitai_ModelAPI):
             f"モデルID: {self.model_id}\n" \
             f"モデル種別: {self.model_type}\n" \
             f"ベースモデル: {self.model_basemodel}\n" \
-            f"モデルタイプ: {self.model_basemodeltype}\n" \
-            f"Civitai URL: https://civitai.com/models/{self.model_id}?modelVersionId={self.ver_id}\n"
-        if self.downloadurl != None:
-            tmptext += f"ダウンロードURL: {self.downloadurl}\n"
+            f"モデルタイプ: {self.model_basemodeltype}\n"
+        if self.trainedWords != False:
+            tmptext += "----------------------------------------\n" \
+            f"トリガーワード\n{self.trainedWords}\n"
         tmptext += "----------------------------------------\n" \
             f"アップロード日: {self._jp_datetime(self.upload_date)}\n" \
             f"公開日: {self._jp_datetime(self.publish_date)}\n" \
             f"Hash: {hash}\n" \
-            "----------------------------------------\n" \
-            "< 禁止事項 >\n"
+            f"Civitai URL: https://civitai.com/models/{self.model_id}?modelVersionId={self.ver_id}\n"
+        if self.downloadurl != None:
+            tmptext += f"ダウンロードURL: {self.downloadurl}\n"
+        tmptext += "----------------------------------------\n< 禁止事項 >\n"
         tmptext += self.disable_permits
         if self.version_description != None:
             tmptext += "----------------------------------------\n" \
@@ -297,10 +310,34 @@ class cmapi(civitai_ModelAPI):
                 "< モデルについて >\n"
             tmptext += self._remove_html_tags(self.model_description)
         fio = fileio()
-        return fio.write(path,tmptext)
+        return fio.write(path,tmptext,ow)
+
+    def Create_InternetShortcutdata(self,folder):
+        """
+            インターネットショートカットを作成
+        Args:
+            folder (str):   ショートカットを作成するフォルダ
+        Returns:
+            成功判断
+        """
+        iscpath = os.path.join(folder, f"{self.model_fname} - Stable Diffusion {self.model_type} - Civitai.url")
+        fio = fileio()
+        if fio.chkpath(iscpath):
+            return False
+        tmptext = "[InternetShortcut]\n" \
+            f"URL=https://civitai.com/models/{self.model_id}\n"
+        fio = fileio()
+        return fio.write(iscpath,tmptext)
 
     #サムネ画像DL設定
     def create_thumbnailcg(self,path):
+        """
+            サムネ画像を作成
+        Args:
+            path (str):   作成するフォルダパス
+        Returns:
+            成功判断
+        """
         fio = fileio()
         cgfilenoext = os.path.splitext(path)[0]
         if fio.chkpath(f"{cgfilenoext}.preview.jpg","jpeg","png","webp"):
@@ -319,11 +356,17 @@ class cmapi(civitai_ModelAPI):
 
     #作例画像DL設定
     def create_examplecg(self,folder):
+        """
+            作例画像を作成
+        Args:
+            folder (str):   作成するフォルダパス
+        Returns:
+            成功判断
+        """
         fio = fileio()
         i = 0
         for imageURL in self.ImageURLs:
             cgfile = os.path.join(folder,os.path.basename(imageURL))
-            print(cgfile)
             if fio.chkpath(cgfile,"jpg","jpeg","png","webp"):
                 continue
             imageURL = imageURL.replace('/width=450','')
@@ -434,6 +477,12 @@ class fileio:
         return False
 
     def read(self,filepath,*mode):
+        '''
+        ファイルを読み込む
+        Args:
+            filepath (str): ファイル
+            *mode (str): r:テキストモードで読み込む(デフォルト) / rb:バイナリモードで読み込む
+        '''
         if not os.path.isfile(filepath):
             return False
         try:
@@ -448,6 +497,13 @@ class fileio:
         else:
             return True
     def write(self,filepath,data,*mode):
+        '''
+        ファイルに書き込む
+        Args:
+            filepath (str): ファイル
+            data (str): 書き込むデータ
+            *mode (str): w:テキストモードで書き込む(デフォルト) / wb:バイナリモードで書き込む /ow 上書きモード
+        '''
         if os.path.isfile(filepath):
             if not 'ow' in mode:
                 return False
@@ -462,6 +518,7 @@ class fileio:
             return False
         else:
             return True
+
     def json(self,filepath,jsondata):
         try:
             with open(filepath, 'w', encoding="utf-8") as iofile:
@@ -538,24 +595,29 @@ def mainform(filelist):
         list_cnt = len(filelist)
         list_now = 0
         fio = fileio()
+        nothumbnail = False
+        noInternetShortcut = False
+        notrigger = False
+        nopermitininfo = False
+        nomodelinfo = False
+        noversioninfo = False
+        noexamplecg = False
+        overwrite = "w"
         if fio.read(config_json):
             config_data = json.loads(fio.filedata)
             nothumbnail = config_data.get('nothumbnail')
             noInternetShortcut = config_data.get('noInternetShortcut')
+            notrigger = config_data.get('notrigger')
             nopermitininfo = config_data.get('nopermitininfo')
             nomodelinfo = config_data.get('nomodelinfo')
             noversioninfo = config_data.get('noversioninfo')
             noexamplecg = config_data.get('noexamplecg')
+            if config_data.get('overwrite'):
+                overwrite = "ow"
+            else:
+                overwrite = "w"
             processmsg("config.jsonを読み込み、初期設定を設定しました")
-        else:
-            nothumbnail = False
-            noInternetShortcut = False
-            nopermitininfo = False
-            nomodelinfo = False
-            noversioninfo = False
-            noexamplecg = False
-            processmsg(f"{config_json}を読み込み、初期設定を設定しました")
-        processmsg(f"処理を開始します\n処理件数は{list_cnt}件です")
+        processmsg(f"処理件数は{list_cnt}件です")
         if not civitai_livechecker():
             processmsg("Civitaiへのアクセスに失敗した為、処理を終了します")
             return
@@ -623,27 +685,31 @@ def mainform(filelist):
                 continue
             processmsg("モデルデータを取得しました")
             modelfinfo.get_modelinfo(civitaiapi)
-            #サムネイルを作成
-            if not nothumbnail:
-                if civitaiapi.create_thumbnailcg(modelfinfo.modelpath):
-                    processmsg("サムネイル画像を作成しました")
+            # トリガーワード作成
+            if not notrigger:
+                if civitaiapi.create_triggerfile(f"{modelfinfo.modelspath}.txt",overwrite):
+                    processmsg("トリガーワードファイルを作成しました")
+            # パーミッションファイルの作成
+            if not nopermitininfo:
+                if civitaiapi.create_permitinfodata(modelfinfo.modelfolder,overwrite):
+                    processmsg("パーミッション情報ファイルを作成しました")
+            # モデル情報を作成の作成
+            if not nomodelinfo:
+                if civitaiapi.create_modelinfo(modelfinfo.modelfolder,overwrite):
+                    processmsg("モデル情報ファイルを作成しました")
+            # バージョン情報の作成
+            if not noversioninfo:
+                if civitaiapi.create_verinfo(modelfinfo.verfolder,modelfinfo.hash,overwrite):
+                    processmsg("バージョン情報ファイルを作成しました")
             # インターネットショートカットの作成
             if not noInternetShortcut:
                 if civitaiapi.Create_InternetShortcutdata(modelfinfo.modelfolder):
                     processmsg("インターネットショートカットを作成しました")
-            # パーミッションファイルの作成
-            if not nopermitininfo:
-                if civitaiapi.create_permitinfodata(modelfinfo.modelfolder):
-                    processmsg("パーミッション情報ファイルを作成しました")
-            # モデル情報を作成の作成
-            if not nomodelinfo:
-                if civitaiapi.create_modelinfo(modelfinfo.modelfolder):
-                    processmsg("モデル情報ファイルを作成しました")
-            # バージョン情報の作成
-            if not noversioninfo:
-                if civitaiapi.create_verinfo(modelfinfo.verfolder,modelfinfo.hash):
-                    processmsg("バージョン情報ファイルを作成しました")
-            # サムネイルの作成
+            # サムネイルを作成
+            if not nothumbnail:
+                if civitaiapi.create_thumbnailcg(modelfinfo.modelpath):
+                    processmsg("サムネイル画像を作成しました")
+            # 作例画像の作成
             if not noexamplecg:
                 processmsg("作例画像を取得します（時間がかかる場合があります）")
                 processmsg(f"{civitaiapi.create_examplecg(modelfinfo.verfolder)}件の作例画像を作成しました")
@@ -655,7 +721,7 @@ def mainform(filelist):
 
 # UI
     main_root = tk.Tk()
-    main_root.title(f"ugomotsu v{appver}")
+    main_root.title(f"Version {appver}")
     main_root.geometry("640x400")
 
     #ステータスバー
@@ -673,34 +739,39 @@ def mainform(filelist):
     # 処理リスト
     process_txt = scrolledtext.ScrolledText(main_root, width = 999,height = 999, relief = tk.SUNKEN, bd = 2)
     process_txt.pack(anchor = tk.NW,padx = 5)
-    process_txt.insert(0., f"ようこそ ugomotsu v{appver}へ")
+    process_txt.insert(0., "処理を開始します。")
     process_txt.configure(state="disabled")
 
     #マルチスレッド
     executor = concurrent.futures.ThreadPoolExecutor(1)
     executor.submit(execute)
-    #シングルスレッド
-#    main_root.after(1,execute)
+    #シングルスレッド(テスト用)
+##    main_root.after(1,execute)
 
     main_root.mainloop()
 
-# インフォメーションフォーム
-def infoform():
+# コンフィグフォーム
+def configform():
     def saveconfig():
         fio = fileio()
         dic =dict(
             nothumbnail = nothumbnail_var.get(),
             noInternetShortcut = noInternetShortcut_var.get(),
+            notrigger = notrigger_var.get(),
             nopermitininfo = nopermitininfo_var.get(),
             nomodelinfo = nomodelinfo_var.get(),
             noversioninfo = noversioninfo_var.get(),
-            noexamplecg = noexamplecg_var.get()
+            noexamplecg = noexamplecg_var.get(),
+            overwrite = overwrite_var.get()
         )
-        fio.json(config_json,dic)
+        if fio.json(config_json,dic):
+            messagebox.showinfo("設定の保存",f"{config_json}\n設定を正常に保存しました。")
+        else:
+            messagebox.showerror("設定の保存", "設定を正常に保存出来ませんでした。")
 
     info_root = tk.Tk()
-    info_root.title(f"ugomotsu v{appver}")
-    info_root.geometry("380x350")
+    info_root.title(f"Version {appver}")
+    info_root.geometry("380x400")
     msg_label = tk.Label(info_root, text = 
         "このプログラムは画像AIモデルのデータをCivitaiから取得するプログラムです。\n"
         "cm-info.jsonやcivirai.infoがあればそれらを使用し時短します。\n\n"
@@ -713,33 +784,47 @@ def infoform():
 
     nothumbnail_var = tk.BooleanVar()
     noInternetShortcut_var = tk.BooleanVar()
+    notrigger_var = tk.BooleanVar()
     nopermitininfo_var = tk.BooleanVar()
     nomodelinfo_var = tk.BooleanVar()
     noversioninfo_var = tk.BooleanVar()
     noexamplecg_var = tk.BooleanVar()
+    overwrite_var = tk.BooleanVar()
     fio = fileio()
     if fio.read(config_json):
         config_data = json.loads(fio.filedata)
         nothumbnail_var.set(config_data.get('nothumbnail'))
         noInternetShortcut_var.set(config_data.get('noInternetShortcut'))
+        if config_data.get('notrigger') == None:
+            notrigger_var.set(False)
+        else:
+            notrigger_var.set(config_data.get('notrigger'))
         nopermitininfo_var.set(config_data.get('nopermitininfo'))
         nomodelinfo_var.set(config_data.get('nomodelinfo'))
         noversioninfo_var.set(config_data.get('noversioninfo'))
         noexamplecg_var.set(config_data.get('noexamplecg'))
+        if config_data.get('overwrite') == None:
+            overwrite_var.set(False)
+        else:
+            overwrite_var.set(config_data.get('overwrite'))
 
     # チェックボックス
-    nothumbnail_Checkbutton = tk.Checkbutton(info_root, variable = nothumbnail_var, text = "サムネイル画像を作成しない")
-    nothumbnail_Checkbutton.pack(anchor=tk.NW,padx=20)
-    noInternetShortcut_Checkbutton = tk.Checkbutton(info_root, variable = noInternetShortcut_var, text = "インターネットショートカットを作成しない")
-    noInternetShortcut_Checkbutton.pack(anchor=tk.NW,padx=20)
+    notrigger_Checkbutton = tk.Checkbutton(info_root, variable = notrigger_var, text = "トリガーワードのファイルを作成しない")
+    notrigger_Checkbutton.pack(anchor=tk.NW,padx=20)
     nopermitininfo_Checkbutton = tk.Checkbutton(info_root, variable = nopermitininfo_var, text = "パーミッションファイルを作成しない")
     nopermitininfo_Checkbutton.pack(anchor=tk.NW,padx=20)
     nomodelinfo_Checkbutton = tk.Checkbutton(info_root, variable = nomodelinfo_var, text = "モデルの情報ファイルを作成しない")
     nomodelinfo_Checkbutton.pack(anchor=tk.NW,padx=20)
     noversioninfo_Checkbutton = tk.Checkbutton(info_root, variable = noversioninfo_var, text = "モデルのバージョン情報ファイルを作成しない")
     noversioninfo_Checkbutton.pack(anchor=tk.NW,padx=20)
+    noInternetShortcut_Checkbutton = tk.Checkbutton(info_root, variable = noInternetShortcut_var, text = "インターネットショートカットを作成しない")
+    noInternetShortcut_Checkbutton.pack(anchor=tk.NW,padx=20)
+    nothumbnail_Checkbutton = tk.Checkbutton(info_root, variable = nothumbnail_var, text = "サムネイル画像を作成しない")
+    nothumbnail_Checkbutton.pack(anchor=tk.NW,padx=20)
     noexamplecg_Checkbutton = tk.Checkbutton(info_root, variable = noexamplecg_var, text = "モデルの作例画像を保存しない")
     noexamplecg_Checkbutton.pack(anchor=tk.NW,padx=20)
+    overwrite_Checkbutton = tk.Checkbutton(info_root, variable = overwrite_var, text = "上書きモードで保存（テキストのみ）")
+    overwrite_Checkbutton.pack(anchor=tk.NW,padx=20)
 
     btnfrm = tk.Frame(info_root)
     btnfrm.pack()
@@ -751,32 +836,27 @@ def infoform():
 # 引数処理
 def addtasklist(argvs):
     flist = []
-    print(f"引数: {argvs}")
     for argv in argvs:
         if os.path.isdir(argv):
             #フォルダなので中身を再帰処理
             hoge = [os.path.join(argv,dirlist) for dirlist in os.listdir(argv)]
-            print(f"フォルダ：{hoge}")
             rlist = addtasklist(hoge)
             if not rlist == []:
                 flist.extend(rlist)
         elif os.path.isfile(argv):
             #AIファイルなら登録
             if argv.endswith(".safetensors") or argv.endswith(".ckpt"):
-                print(f"ファイル登録：{argv}")
                 flist.append(argv)
     return flist
 
 def main():
     if len(sys.argv) > 1:
-        print(config_json)
         files = sys.argv
         files.pop(0)
         hoge = addtasklist(files)
-        print(f"@@@@@: {hoge}")
         mainform(hoge)
     else:
-        infoform()
+        configform()
 
 if __name__ == "__main__":
     main()

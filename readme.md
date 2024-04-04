@@ -1,8 +1,9 @@
 # ugomotsu
+
 Civitaiの情報を基にモデル情報を作成するアプリ
 
 **取得できる情報**
----
+
 - サムネイル画像
 - Civitaiへのインターネットショートカット
 - Civitaiに登録されているモデルに関する情報
@@ -29,24 +30,24 @@ Civitaiの情報を基にモデル情報を作成するアプリ
 
 エクスプローラでインストールしたい場所を開き、アドレスバーにcmdと入力してコマンドプロンプトを開き、下記のコマンドを入力して実行します。
 1. **git clone https://github.com/tkvier/ugomotsu.git**
-1. **cd .\\ugomotsu**
-1. **.python -m venv venv**
-1. **.\\venv\\Scripts\\activate**
-1. **pip install requests**
+2. **cd .\\ugomotsu**
+3. **.python -m venv venv**
+4. **.\\venv\\Scripts\\activate**
+5. **pip install requests**
 
 #### 使い方（設定画面）
 
 エクスプローラでインストールしたい場所を開き、アドレスバーにcmdと入力してコマンドプロンプトを開き、下記のコマンドを入力して実行します。
 1. **.python -m venv venv**
-1. **.\\venv\\Scripts\\activate**
-1. **python ugomotsu.py**
+2. **.\\venv\\Scripts\\activate**
+3. **python ugomotsu.py**
 
 #### 使い方（情報取得）
 
 エクスプローラでインストールしたい場所を開き、アドレスバーにcmdと入力してコマンドプロンプトを開き、下記のコマンドを入力して実行します。
 1. **.python -m venv venv**
-1. **.\\venv\\Scripts\\activate**
-1. **python ugomotsu.py** 取得したいモデルのパス(複数OK)
+2. **.\\venv\\Scripts\\activate**
+3. **python ugomotsu.py** 取得したいモデルのパス(複数OK)
 
 ## ライセンス
 
